@@ -28,7 +28,7 @@ export default function Navbar() {
             width={1822}
             height={400}
             sizes="182px"
-            priority
+            preload
             className="h-10 w-auto"
           />
         </Link>
