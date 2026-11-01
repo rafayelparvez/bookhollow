@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+@theme {
+  /* Palette sampled from public/images/bookhollow-logo-*.png */
+  --color-brand: #de3241;
+  --color-brand-dark: #b02634;
+  --color-brand-light: #ff6b77;
+  --color-brand-soft: #f4b6bb;
+  --color-cream: #fbf6ee;
+  --color-ink: #2a1a1c;
+  --color-ink-900: #1c1214;
+}
