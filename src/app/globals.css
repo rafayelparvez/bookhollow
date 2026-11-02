@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Theme is driven by a `dark` class on <html> so the navbar toggle can override
+   the operating-system preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Palette sampled from public/images/bookhollow-logo-*.png */
   --color-brand: #de3241;
@@ -7,6 +11,22 @@
   --color-brand-light: #ff6b77;
   --color-brand-soft: #f4b6bb;
   --color-cream: #fbf6ee;
+  --color-cream-dark: #f3ead9;
   --color-ink: #2a1a1c;
   --color-ink-900: #1c1214;
+}
+
+/* Let the browser paint native controls (selects, scrollbars, date pickers)
+   in the right shade for the active theme. */
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+::selection {
+  background-color: var(--color-brand);
+  color: var(--color-cream);
 }

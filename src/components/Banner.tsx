@@ -2,21 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Inter, Playfair_Display } from "next/font/google";
-import { useCallback, useEffect, useState } from "react";
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
-  display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-});
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { MouseEvent, PointerEvent } from "react";
 
 const AUTOPLAY_DELAY = 5000;
+const SWIPE_THRESHOLD = 50; // px
 
 type Slide = {
   id: string;
@@ -72,6 +62,8 @@ const focusRing =
 export default function Banner() {
   const [index, setIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const didSwipe = useRef(false);
   const count = slides.length;
 
   const goTo = useCallback(
@@ -89,17 +81,70 @@ export default function Banner() {
     return () => clearInterval(timer);
   }, [count, index, isPaused]);
 
+  // Hover pause shudhu mouse e, touch e na
+  const handlePointerEnter = (e: PointerEvent<HTMLElement>) => {
+    if (e.pointerType === "mouse") setIsPaused(true);
+  };
+
+  const handlePointerLeave = (e: PointerEvent<HTMLElement>) => {
+    if (e.pointerType === "mouse") {
+      setIsPaused(false);
+      pointerStart.current = null; // drag korte korte bahire gele cancel
+    }
+  };
+
+  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    // Mouse e shudhu left click
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    didSwipe.current = false;
+    pointerStart.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handlePointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    const start = pointerStart.current;
+    pointerStart.current = null;
+    if (!start) return;
+
+    const deltaX = e.clientX - start.x;
+    const deltaY = e.clientY - start.y;
+
+    // Chhoto movement ba vertical movement hole ignore (normal click/scroll)
+    if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
+    if (Math.abs(deltaX) < Math.abs(deltaY)) return;
+
+    // Drag er por CTA link e accidental click jeno na hoy
+    didSwipe.current = true;
+
+    // Left drag = next, right drag = previous
+    goTo(deltaX < 0 ? index + 1 : index - 1);
+  };
+
+  const handleClickCapture = (e: MouseEvent<HTMLDivElement>) => {
+    if (didSwipe.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      didSwipe.current = false;
+    }
+  };
+
   return (
     <section
       aria-roledescription="carousel"
       aria-label="Featured from the BookHollow shelves"
-      className={`relative isolate overflow-hidden bg-ink-900 text-cream ${inter.className}`}
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
+      className="relative isolate overflow-hidden bg-ink-900 text-cream"
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
       onFocusCapture={() => setIsPaused(true)}
       onBlurCapture={() => setIsPaused(false)}
     >
-      <div className="relative h-[clamp(540px,78vh,760px)] w-full">
+      <div
+        className="relative h-[clamp(540px,78vh,760px)] w-full cursor-grab touch-pan-y select-none active:cursor-grabbing"
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => (pointerStart.current = null)}
+        onClickCapture={handleClickCapture}
+        onDragStart={(e) => e.preventDefault()}
+      >
         {slides.map((slide, slideIndex) => {
           const isActive = slideIndex === index;
 
@@ -120,11 +165,12 @@ export default function Banner() {
                 fill
                 preload={slideIndex === 0}
                 sizes="100vw"
+                draggable={false}
                 className="object-cover object-center"
               />
 
-              <div className="absolute inset-0 bg-linear-to-r from-black/85 via-black/60 to-black/10" />
-              <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-black/30" />
+              <div className="absolute inset-0 bg-linear-to-r from-ink-900/90 via-ink-900/60 to-ink-900/10" />
+              <div className="absolute inset-0 bg-linear-to-t from-ink-900/80 via-ink-900/10 to-ink-900/35" />
 
               <div className="relative z-10 mx-auto flex h-full max-w-7xl items-center px-6 py-16 sm:px-10 lg:px-12">
                 <div
@@ -138,9 +184,7 @@ export default function Banner() {
                     {slide.eyebrow}
                   </p>
 
-                  <h2
-                    className={`${playfair.className} mt-5 text-balance text-4xl font-bold leading-[1.05] text-white sm:text-5xl lg:text-6xl xl:text-7xl`}
-                  >
+                  <h2 className="mt-5 text-balance text-4xl font-bold leading-[1.05] text-cream sm:text-5xl lg:text-6xl xl:text-7xl">
                     {slide.title}
                   </h2>
 
@@ -150,8 +194,9 @@ export default function Banner() {
 
                   <Link
                     href={slide.cta.href}
+                    draggable={false}
                     tabIndex={isActive ? undefined : -1}
-                    className={`mt-9 inline-flex items-center rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-dark sm:text-base ${focusRing}`}
+                    className={`mt-9 inline-flex cursor-pointer items-center rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-cream transition-colors hover:bg-brand-dark sm:text-base ${focusRing}`}
                   >
                     {slide.cta.label}
                   </Link>
@@ -161,24 +206,6 @@ export default function Banner() {
           );
         })}
       </div>
-
-      <button
-        type="button"
-        onClick={() => goTo(index - 1)}
-        aria-label="Previous slide"
-        className={`absolute right-16 bottom-5 z-20 flex size-10 items-center justify-center rounded-full border border-white/25 bg-black/30 text-white backdrop-blur-sm transition-colors hover:border-white/60 hover:bg-white/15 sm:top-1/2 sm:right-auto sm:bottom-auto sm:left-5 sm:size-12 sm:-translate-y-1/2 ${focusRing}`}
-      >
-        <ChevronIcon direction="left" className="size-5 sm:size-6" />
-      </button>
-
-      <button
-        type="button"
-        onClick={() => goTo(index + 1)}
-        aria-label="Next slide"
-        className={`absolute right-4 bottom-5 z-20 flex size-10 items-center justify-center rounded-full border border-white/25 bg-black/30 text-white backdrop-blur-sm transition-colors hover:border-white/60 hover:bg-white/15 sm:top-1/2 sm:bottom-auto sm:right-5 sm:size-12 sm:-translate-y-1/2 ${focusRing}`}
-      >
-        <ChevronIcon direction="right" className="size-5 sm:size-6" />
-      </button>
 
       <div className="absolute inset-x-0 bottom-6 z-20 flex items-center justify-center gap-2.5">
         {slides.map((slide, slideIndex) => {
@@ -194,35 +221,12 @@ export default function Banner() {
               className={`h-2 rounded-full transition-all duration-300 motion-reduce:transition-none ${
                 isActive
                   ? "w-7 bg-brand"
-                  : "w-2 bg-white/45 hover:bg-white/75"
+                  : "w-2 bg-cream/45 hover:bg-cream/75"
               } ${focusRing}`}
             />
           );
         })}
       </div>
     </section>
-  );
-}
-
-function ChevronIcon({
-  direction,
-  className,
-}: {
-  direction: "left" | "right";
-  className?: string;
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={className}
-    >
-      <path d={direction === "left" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
-    </svg>
   );
 }
