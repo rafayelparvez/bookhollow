@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useCurrentUser } from "@/lib/auth";
+import { deleteBookRequest } from "@/lib/book-mutations";
 import {
   borrowBook,
   borrowsMatchUser,
   hasBorrowed,
   useBorrows,
 } from "@/lib/borrows";
-import { useBooks } from "@/lib/books";
+import { isBookAddedByUser, useBooks } from "@/lib/books";
 
 const primaryButton =
   "inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-6 py-3 font-sans text-sm font-semibold text-cream transition-colors hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-brand dark:focus-visible:outline-brand-light";
@@ -16,12 +19,18 @@ const primaryButton =
 const secondaryButton =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-ink/15 bg-cream px-6 py-3 font-sans text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:hover:border-brand-light/40 dark:hover:bg-brand/10 dark:hover:text-brand-light dark:focus-visible:outline-brand-light";
 
+const dangerButton =
+  "inline-flex items-center justify-center gap-2 rounded-lg border border-brand/30 bg-brand/5 px-6 py-3 font-sans text-sm font-semibold text-brand-dark transition-colors hover:bg-brand/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-60 dark:border-brand-light/30 dark:bg-brand/10 dark:text-brand-light dark:hover:bg-brand/15 dark:focus-visible:outline-brand-light";
+
 const DAYS_IN_LOAN = 7;
 
 export default function BookDetails({ bookId }: { bookId: string }) {
+  const router = useRouter();
   const { books, loading, error, retry } = useBooks();
   const user = useCurrentUser();
   const borrows = useBorrows();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   if (loading) {
     return (
@@ -76,6 +85,32 @@ export default function BookDetails({ bookId }: { bookId: string }) {
 
   const borrowedByMe = hasBorrowed(borrows, book._id, user);
   const isAvailable = book.availableCopies > 0;
+  const isOwner = user ? isBookAddedByUser(book, user) : false;
+  const target = book;
+
+  async function handleDelete() {
+    if (!isOwner) return;
+    if (!window.confirm(`Delete "${target.title}"? This cannot be undone.`)) {
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError("");
+
+    try {
+      await deleteBookRequest(target._id);
+      router.replace("/my-books");
+      router.refresh();
+    } catch (cause) {
+      setDeleteError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not delete this book. Please try again.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
   const myRecord = user
     ? borrows.find(
         (record) =>
@@ -240,6 +275,35 @@ export default function BookDetails({ bookId }: { bookId: string }) {
             </div>
           )}
         </div>
+
+        {isOwner && (
+          <div className="mt-6 border-t border-ink/10 pt-6 dark:border-cream/10">
+            <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-ink/45 dark:text-cream/45">
+              Manage this book
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Link href={`/books/${book._id}/edit`} className={secondaryButton}>
+                Edit book
+              </Link>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className={dangerButton}
+              >
+                {deleting ? "Deleting…" : "Delete book"}
+              </button>
+            </div>
+            {deleteError && (
+              <p
+                role="alert"
+                className="mt-3 font-sans text-sm text-brand-dark dark:text-brand-light"
+              >
+                {deleteError}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

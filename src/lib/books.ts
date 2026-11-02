@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { API_URL } from "@/lib/api";
+import { bookBelongsToUser } from "@/lib/book-ownership";
 import type { CurrentUser } from "@/lib/auth";
 
 export interface Book {
@@ -67,13 +68,5 @@ export function useBooks(): BooksState {
 }
 
 export function isBookAddedByUser(book: Book, user: CurrentUser): boolean {
-  const addedBy = book.addedBy;
-  if (!addedBy) return false;
-
-  const emailMatches =
-    !!addedBy.email &&
-    addedBy.email.toLowerCase() === user.email.toLowerCase();
-  const idMatches = !!addedBy.id && addedBy.id === user.id;
-
-  return emailMatches || idMatches;
+  return bookBelongsToUser(book, user);
 }

@@ -1,29 +1,79 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useCurrentUser } from "@/lib/auth";
+import { deleteBookRequest } from "@/lib/book-mutations";
 import { hasBorrowed, useBorrows } from "@/lib/borrows";
+import { isBookAddedByUser } from "@/lib/books";
 import type { Book } from "@/lib/books";
 
 export const BOOK_GRID_CLASS =
   "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4";
 
-export function BookGrid({ books }: { books: Book[] }) {
+export function BookGrid({
+  books,
+  manage,
+  onDeleted,
+}: {
+  books: Book[];
+  manage?: boolean;
+  onDeleted?: () => void;
+}) {
   return (
     <div className={BOOK_GRID_CLASS}>
       {books.map((book) => (
-        <BookCard key={book._id} book={book} />
+        <BookCard
+          key={book._id}
+          book={book}
+          manage={manage}
+          onDeleted={onDeleted}
+        />
       ))}
     </div>
   );
 }
 
-export default function BookCard({ book }: { book: Book }) {
+export default function BookCard({
+  book,
+  manage,
+  onDeleted,
+}: {
+  book: Book;
+  manage?: boolean;
+  onDeleted?: () => void;
+}) {
   const user = useCurrentUser();
   const borrows = useBorrows();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const borrowedByMe = hasBorrowed(borrows, book._id, user);
   const isAvailable = book.availableCopies > 0;
+  const isOwner = !!user && isBookAddedByUser(book, user);
+
+  async function handleDelete() {
+    if (!isOwner) return;
+    if (!window.confirm(`Delete "${book.title}"? This cannot be undone.`)) {
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError("");
+
+    try {
+      await deleteBookRequest(book._id);
+      onDeleted?.();
+    } catch (cause) {
+      setDeleteError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not delete this book. Please try again.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-ink/10 bg-cream shadow-sm transition duration-300 hover:-translate-y-1 hover:border-brand/30 hover:shadow-xl motion-reduce:transform-none motion-reduce:transition-none dark:border-cream/10 dark:bg-ink dark:hover:border-brand-light/40">
@@ -105,6 +155,35 @@ export default function BookCard({ book }: { book: Book }) {
           View Details
           <ArrowRightIcon className="size-4" />
         </Link>
+
+        {manage && isOwner && (
+          <div className="mt-2">
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href={`/books/${book._id}/edit`}
+                className="inline-flex items-center justify-center rounded-lg border border-ink/15 bg-cream px-3 py-2 font-sans text-xs font-semibold text-ink transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:hover:border-brand-light/40 dark:hover:bg-brand/10 dark:hover:text-brand-light dark:focus-visible:outline-brand-light"
+              >
+                Edit
+              </Link>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-flex items-center justify-center rounded-lg border border-brand/25 bg-brand/5 px-3 py-2 font-sans text-xs font-semibold text-brand-dark transition-colors hover:bg-brand/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-60 dark:border-brand-light/25 dark:bg-brand/10 dark:text-brand-light dark:hover:bg-brand/15 dark:focus-visible:outline-brand-light"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+            {deleteError && (
+              <p
+                role="alert"
+                className="mt-2 font-sans text-[11px] leading-relaxed text-brand-dark dark:text-brand-light"
+              >
+                {deleteError}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </article>
   );

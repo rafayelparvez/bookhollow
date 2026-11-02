@@ -16,6 +16,8 @@ type BookCollectionProps = {
   emptyAction?: EmptyAction;
   countLabel?: (count: number) => string;
   label?: string;
+  manage?: boolean;
+  onDeleted?: () => void;
 };
 
 const primaryButton =
@@ -31,6 +33,8 @@ export default function BookCollection({
   emptyAction,
   countLabel,
   label = "Books",
+  manage,
+  onDeleted,
 }: BookCollectionProps) {
   if (loading) {
     return (
@@ -103,7 +107,7 @@ export default function BookCollection({
         </h2>
       </div>
 
-      <BookGrid books={books} />
+      <BookGrid books={books} manage={manage} onDeleted={onDeleted} />
     </section>
   );
 }

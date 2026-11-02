@@ -34,6 +34,8 @@ function MyBooksList() {
       countLabel={(count) =>
         `${count} ${count === 1 ? "book" : "books"} added by you`
       }
+      manage
+      onDeleted={retry}
     />
   );
 }

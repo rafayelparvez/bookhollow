@@ -15,6 +15,13 @@ const primaryButton =
 
 const MIN_PASSWORD_LENGTH = 8;
 
+const GOOGLE_AUTH_ENABLED = Boolean(
+  process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim(),
+);
+
+const googleButton =
+  "mt-3 inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-ink/15 bg-cream font-sans text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-70 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:hover:border-brand-light/40 dark:hover:bg-brand/10 dark:hover:text-brand-light dark:focus-visible:outline-brand-light";
+
 export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const { user, isPending } = useAuth();
@@ -26,6 +33,7 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,6 +91,41 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleGoogle() {
+    setError("");
+
+    if (!GOOGLE_AUTH_ENABLED) {
+      setError(
+        "Google sign-in isn't configured yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env.local, then restart the dev server.",
+      );
+      return;
+    }
+
+    setOauthLoading(true);
+
+    try {
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: readNextPath(),
+      });
+
+      if (result?.error) {
+        setError(
+          result.error.message ??
+            "Google sign-in could not be started. Please try again.",
+        );
+        setOauthLoading(false);
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Google sign-in could not be started. Please try again.",
+      );
+      setOauthLoading(false);
     }
   }
 
@@ -245,6 +288,39 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
           )}
         </button>
 
+        <div className="mt-5 flex items-center gap-3" aria-hidden="true">
+          <span className="h-px flex-1 bg-ink/10 dark:bg-cream/10" />
+          <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/40 dark:text-cream/40">
+            or
+          </span>
+          <span className="h-px flex-1 bg-ink/10 dark:bg-cream/10" />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={oauthLoading}
+          aria-busy={oauthLoading}
+          className={googleButton}
+        >
+          {oauthLoading ? (
+            <SpinnerIcon className="size-4 animate-spin" />
+          ) : (
+            <GoogleIcon className="size-4" />
+          )}
+          {oauthLoading
+            ? "Redirecting…"
+            : isLogin
+              ? "Sign in with Google"
+              : "Sign up with Google"}
+        </button>
+
+        {!GOOGLE_AUTH_ENABLED && (
+          <p className="mt-2 text-center font-sans text-[11px] leading-relaxed text-ink/40 dark:text-cream/40">
+            Add Google OAuth credentials to .env.local to enable this button.
+          </p>
+        )}
+
         <p className="mt-5 text-center font-sans text-sm text-ink/55 dark:text-cream/55">
           {isLogin ? (
             <>
@@ -270,6 +346,29 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
         </p>
       </div>
     </form>
+  );
+}
+
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+      <path
+        fill="#4285F4"
+        d="M23.52 12.27c0-.82-.07-1.6-.2-2.36H12v4.47h6.47a5.53 5.53 0 0 1-2.4 3.63v3.02h3.89c2.27-2.09 3.56-5.17 3.56-8.76Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.89-3.02c-1.08.72-2.45 1.15-4.06 1.15-3.13 0-5.78-2.11-6.72-4.95H1.27v3.12A12 12 0 0 0 12 24Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27a7.2 7.2 0 0 1 0-4.54V6.61H1.27a12 12 0 0 0 0 10.78l4.01-3.12Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.78c1.76 0 3.34.61 4.59 1.79l3.44-3.44A11.97 11.97 0 0 0 12 0 12 12 0 0 0 1.27 6.61l4.01 3.12C6.22 6.89 8.87 4.78 12 4.78Z"
+      />
+    </svg>
   );
 }
 
