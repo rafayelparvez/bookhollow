@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 const SITE = {
   name: "BookHollow",
@@ -21,7 +22,7 @@ export default function Footer() {
       <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 md:grid-cols-3 md:gap-12">
         {/* Brand */}
         <div>
-          <a href="/" aria-label={`${SITE.name} home`} className="inline-block">
+          <Link href="/" aria-label={`${SITE.name} home`} className="inline-block">
             {/* Light mode logo */}
             <Image
               src="/images/bookhollow-logo-light.png"
@@ -38,13 +39,13 @@ export default function Footer() {
               height={56}
               className="hidden h-14 w-auto dark:block"
             />
-          </a>
+          </Link>
           <p className="mt-5 max-w-sm text-lg leading-relaxed text-ink/70 dark:text-cream/70">
             {SITE.tagline}
           </p>
         </div>
 
-        {/* Contact */}
+        {/* Contact (mailto / tel are not pages, so plain <a> is correct here) */}
         <div>
           <h2 className="text-2xl font-bold">Contact</h2>
           <ul className="mt-5 space-y-4 text-lg text-ink/70 dark:text-cream/70">
@@ -73,7 +74,7 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* Social */}
+        {/* Social (external sites, so plain <a> opening in a new tab) */}
         <div>
           <h2 className="text-2xl font-bold">Follow us</h2>
           <ul className="mt-5 flex gap-4">
@@ -82,6 +83,8 @@ export default function Footer() {
                 <a
                   href={href}
                   aria-label={label}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex h-16 w-16 items-center justify-center rounded-full border border-ink/10 bg-cream text-ink transition hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-cream/10 dark:bg-ink-900 dark:text-cream"
                 >
                   <Icon className="h-6 w-6" />
