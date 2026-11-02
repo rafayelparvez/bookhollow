@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Gentium_Book_Plus } from "next/font/google";
 import Navbar from "@/components/navbar";
 import "./globals.css";
+import Footer from "@/components/Footer";
 
 const gentiumBookPlus = Gentium_Book_Plus({
   subsets: ["latin"],
@@ -49,6 +50,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <Navbar />
         {children}
+        <Footer />
       </body>
     </html>
   );
