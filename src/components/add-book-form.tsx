@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { useCurrentUser } from "@/lib/auth";
+import { API_URL } from "@/lib/api";
+import { useAuth, useMounted } from "@/lib/auth";
 
 const categories = [
   "Fiction",
@@ -17,9 +19,7 @@ const categories = [
   "Children",
 ];
 
-const ADD_BOOK_ENDPOINT = `${
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
-}/add-book`;
+const ADD_BOOK_ENDPOINT = `${API_URL}/add-book`;
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
 
@@ -29,7 +29,8 @@ const fieldBase =
 type Status = "idle" | "submitting" | "success" | "error";
 
 export default function AddBookForm() {
-  const user = useCurrentUser();
+  const { user, isPending } = useAuth();
+  const mounted = useMounted();
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -91,11 +92,28 @@ export default function AddBookForm() {
     }
   }
 
+  if (!mounted || isPending) {
+    return (
+      <div className="flex justify-center py-16">
+        <span
+          className="size-7 animate-spin rounded-full border-2 border-brand/25 border-t-brand dark:border-cream/20 dark:border-t-brand-light"
+          aria-label="Loading"
+        />
+      </div>
+    );
+  }
+
   if (!user) {
     return (
-      <p className="rounded-lg border border-ink/10 bg-cream px-4 py-3 font-sans text-sm text-ink/70 dark:border-cream/10 dark:bg-ink dark:text-cream/70">
-        Please sign in to add a book.
-      </p>
+      <div className="rounded-lg border border-ink/10 bg-cream px-4 py-4 font-sans text-sm text-ink/70 dark:border-cream/10 dark:bg-ink dark:text-cream/70">
+        Please sign in to add a book.{" "}
+        <Link
+          href="/login?next=%2Fadd-book"
+          className="font-semibold text-brand hover:text-brand-dark dark:text-brand-light dark:hover:text-brand-soft"
+        >
+          Login
+        </Link>
+      </div>
     );
   }
 
