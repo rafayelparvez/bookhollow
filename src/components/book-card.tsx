@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCurrentUser } from "@/lib/auth";
 import { deleteBookRequest } from "@/lib/book-mutations";
-import { hasBorrowed, useBorrows } from "@/lib/borrows";
+import { hasBorrowed, returnBook, useBorrows } from "@/lib/borrows";
 import { isBookAddedByUser } from "@/lib/books";
 import type { Book } from "@/lib/books";
 
@@ -15,10 +15,14 @@ export function BookGrid({
   books,
   manage,
   onDeleted,
+  returnable,
+  onReturned,
 }: {
   books: Book[];
   manage?: boolean;
   onDeleted?: () => void;
+  returnable?: boolean;
+  onReturned?: () => void;
 }) {
   return (
     <div className={BOOK_GRID_CLASS}>
@@ -28,6 +32,8 @@ export function BookGrid({
           book={book}
           manage={manage}
           onDeleted={onDeleted}
+          returnable={returnable}
+          onReturned={onReturned}
         />
       ))}
     </div>
@@ -38,10 +44,14 @@ export default function BookCard({
   book,
   manage,
   onDeleted,
+  returnable,
+  onReturned,
 }: {
   book: Book;
   manage?: boolean;
   onDeleted?: () => void;
+  returnable?: boolean;
+  onReturned?: () => void;
 }) {
   const user = useCurrentUser();
   const borrows = useBorrows();

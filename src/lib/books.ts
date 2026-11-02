@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { API_URL } from "@/lib/api";
 import { bookBelongsToUser } from "@/lib/book-ownership";
 import type { CurrentUser } from "@/lib/auth";
 
@@ -40,7 +39,7 @@ export function useBooks(): BooksState {
 
     async function loadBooks() {
       try {
-        const res = await fetch(`${API_URL}/books`, {
+        const res = await fetch(`/api/books`, {
           signal: controller.signal,
         });
         if (!res.ok) throw new Error("Failed to load books.");

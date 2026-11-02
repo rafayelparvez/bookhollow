@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { API_URL } from "@/lib/api";
 import { useAuth, useMounted } from "@/lib/auth";
 import { BOOK_CATEGORIES } from "@/lib/book-categories";
 import { MAX_IMAGE_BYTES, readFileAsDataUrl } from "@/lib/files";
 
-const ADD_BOOK_ENDPOINT = `${API_URL}/add-book`;
+const ADD_BOOK_ENDPOINT = `/api/books`;
 
 const fieldBase =
   "w-full rounded-lg border border-ink/15 bg-cream font-sans text-sm text-ink outline-none transition placeholder:text-ink/35 hover:border-ink/25 focus:border-brand focus:ring-4 focus:ring-brand/15 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:placeholder:text-cream/35 dark:hover:border-cream/25 dark:focus:border-brand-light dark:focus:ring-brand-light/20";
