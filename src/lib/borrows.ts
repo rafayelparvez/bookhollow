@@ -1,148 +1,131 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import type { CurrentUser } from "@/lib/auth";
+import { useEffect, useSyncExternalStore } from "react";
+import { apiFetch } from "@/lib/api";
+import { useCurrentUser } from "@/lib/auth";
+
+// Express-এর route আলাদা হলে শুধু এই তিনটা বদলান
+const MY_BORROWS_PATH = "/borrows";
+const BORROW_PATH = "/borrows";
+// Server returns a book with DELETE /borrows/:id
+const returnPath = (recordId: string) => `/borrows/${recordId}`;
 
 export type BorrowRecord = {
+  _id: string;
   bookId: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
   borrowedAt: string;
+  dueAt?: string;
+  returnedAt?: string | null;
 };
 
-/**
- * The current backend only exposes `GET /books` and `POST /add-book`, so
- * borrows are tracked in this browser. The record is keyed by user id/email,
- * which lets several accounts share one browser without seeing each other's
- * borrows. Swap this store for API calls once a borrow endpoint exists.
- */
-const BORROWS_KEY = "bookhollow:borrows";
 const EMPTY: BorrowRecord[] = [];
 
+let records: BorrowRecord[] = EMPTY;
+let loadedForUser: string | null = null;
+let inflight: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
-function emit() {
+function setRecords(next: BorrowRecord[]) {
+  if (records === next) return;
+  records = next;
   for (const listener of listeners) listener();
-}
-
-function isBorrowRecord(value: unknown): value is BorrowRecord {
-  if (!value || typeof value !== "object") return false;
-  const record = value as Record<string, unknown>;
-  return (
-    typeof record.bookId === "string" &&
-    typeof record.userId === "string" &&
-    typeof record.userEmail === "string" &&
-    typeof record.borrowedAt === "string"
-  );
-}
-
-function parse(value: string): BorrowRecord[] {
-  try {
-    const data: unknown = JSON.parse(value);
-    return Array.isArray(data) ? data.filter(isBorrowRecord) : [];
-  } catch {
-    return [];
-  }
-}
-
-function readRaw(): string | null {
-  try {
-    return window.localStorage.getItem(BORROWS_KEY);
-  } catch {
-    return null;
-  }
-}
-
-let cachedRaw: string | null = null;
-let cached: BorrowRecord[] = EMPTY;
-let hasReadStorage = false;
-
-function getSnapshot(): BorrowRecord[] {
-  const raw = readRaw();
-
-  if (!hasReadStorage || raw !== cachedRaw) {
-    hasReadStorage = true;
-    cachedRaw = raw;
-    cached = raw ? parse(raw) : EMPTY;
-  }
-
-  return cached;
-}
-
-function getServerSnapshot(): BorrowRecord[] {
-  return EMPTY;
 }
 
 function subscribe(onStoreChange: () => void) {
   listeners.add(onStoreChange);
-  window.addEventListener("storage", onStoreChange);
   return () => {
     listeners.delete(onStoreChange);
-    window.removeEventListener("storage", onStoreChange);
   };
 }
 
-function write(records: BorrowRecord[]) {
-  try {
-    window.localStorage.setItem(BORROWS_KEY, JSON.stringify(records));
-  } catch {
-    // Storage can be unavailable (private mode, blocked cookies).
-  }
-
-  emit();
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
 }
 
-export function useBorrows(): BorrowRecord[] {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+// Server sends `borrowDate`/`returnDate`; map them onto our field names.
+function normalize(data: unknown): BorrowRecord[] {
+  const list = Array.isArray(data)
+    ? data
+    : data && typeof data === "object" && Array.isArray((data as { borrows?: unknown }).borrows)
+      ? (data as { borrows: unknown[] }).borrows
+      : [];
+
+  return list
+    .map((item): BorrowRecord | null => {
+      if (!item || typeof item !== "object") return null;
+      const raw = item as Record<string, unknown>;
+      const _id = asString(raw._id);
+      const bookId = asString(raw.bookId);
+      if (!_id || !bookId) return null;
+      return {
+        _id,
+        bookId,
+        borrowedAt:
+          asString(raw.borrowedAt) ??
+          asString(raw.borrowDate) ??
+          new Date().toISOString(),
+        dueAt: asString(raw.dueAt) ?? asString(raw.returnDate),
+        returnedAt: asString(raw.returnedAt) ?? null,
+      };
+    })
+    .filter((record): record is BorrowRecord => record !== null && !record.returnedAt);
 }
 
-export function borrowsMatchUser(
-  record: BorrowRecord,
-  user: CurrentUser,
-): boolean {
-  return (
-    record.userId === user.id ||
-    record.userEmail.toLowerCase() === user.email.toLowerCase()
+export async function refreshBorrows(): Promise<void> {
+  const data = await apiFetch<unknown>(MY_BORROWS_PATH);
+  setRecords(normalize(data));
+}
+
+function ensureLoaded(userId: string) {
+  if (loadedForUser === userId || inflight) return;
+  inflight = refreshBorrows()
+    .then(() => {
+      loadedForUser = userId;
+    })
+    .catch(() => {
+      // পরের mount-এ আবার চেষ্টা হবে
+    })
+    .finally(() => {
+      inflight = null;
+    });
+}
+
+export function useMyBorrows(): BorrowRecord[] {
+  const user = useCurrentUser();
+  const userId = user?.id ?? null;
+
+  const current = useSyncExternalStore(
+    subscribe,
+    () => records,
+    () => EMPTY,
   );
+
+  useEffect(() => {
+    if (!userId) {
+      loadedForUser = null;
+      setRecords(EMPTY);
+      return;
+    }
+    if (loadedForUser !== null && loadedForUser !== userId) {
+      // অন্য account-এ login হলে আগের data ফেলে দিন
+      loadedForUser = null;
+      setRecords(EMPTY);
+    }
+    ensureLoaded(userId);
+  }, [userId]);
+
+  return userId ? current : EMPTY;
 }
 
-export function hasBorrowed(
-  records: BorrowRecord[],
-  bookId: string,
-  user: CurrentUser | null,
-): boolean {
-  if (!user) return false;
-  return records.some(
-    (record) => record.bookId === bookId && borrowsMatchUser(record, user),
-  );
+export async function borrowBook(bookId: string): Promise<void> {
+  await apiFetch(BORROW_PATH, {
+    method: "POST",
+    body: JSON.stringify({ bookId }),
+  });
+  await refreshBorrows();
 }
 
-export function borrowBook(
-  bookId: string,
-  user: CurrentUser,
-): BorrowRecord | null {
-  const current = getSnapshot();
-
-  if (current.some((record) => record.bookId === bookId && borrowsMatchUser(record, user))) {
-    return null;
-  }
-
-  const record: BorrowRecord = {
-    bookId,
-    userId: user.id,
-    userName: user.name,
-    userEmail: user.email,
-    borrowedAt: new Date().toISOString(),
-  };
-
-  write([record, ...current]);
-  return record;
-}
-
-export function returnBook(bookId: string, user: CurrentUser): void {
-  const next = getSnapshot().filter(
-    (record) => !(record.bookId === bookId && borrowsMatchUser(record, user)),
-  );
-  write(next);
+export async function returnBook(recordId: string): Promise<void> {
+  await apiFetch(returnPath(recordId), { method: "DELETE" });
+  await refreshBorrows();
 }

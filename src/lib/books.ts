@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { API_URL } from "@/lib/api";
 import { bookBelongsToUser } from "@/lib/book-ownership";
 import type { CurrentUser } from "@/lib/auth";
 
@@ -39,12 +40,12 @@ export function useBooks(): BooksState {
 
     async function loadBooks() {
       try {
-        const res = await fetch(`/api/books`, {
+        const res = await fetch(`${API_URL}/books`, {
           signal: controller.signal,
         });
         if (!res.ok) throw new Error("Failed to load books.");
-        const data: Book[] = await res.json();
-        setBooks(data);
+        const data: Book[] | { books?: Book[] } = await res.json();
+        setBooks(Array.isArray(data) ? data : (data.books ?? []));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Something went wrong.");

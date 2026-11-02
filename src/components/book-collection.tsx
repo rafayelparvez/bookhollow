@@ -18,6 +18,8 @@ type BookCollectionProps = {
   label?: string;
   manage?: boolean;
   onDeleted?: () => void;
+  returnable?: boolean;
+  onReturned?: () => void;
 };
 
 const primaryButton =
@@ -35,6 +37,8 @@ export default function BookCollection({
   label = "Books",
   manage,
   onDeleted,
+  returnable,
+  onReturned,
 }: BookCollectionProps) {
   if (loading) {
     return (
@@ -107,7 +111,13 @@ export default function BookCollection({
         </h2>
       </div>
 
-      <BookGrid books={books} manage={manage} onDeleted={onDeleted} />
+      <BookGrid
+        books={books}
+        manage={manage}
+        onDeleted={onDeleted}
+        returnable={returnable}
+        onReturned={onReturned}
+      />
     </section>
   );
 }

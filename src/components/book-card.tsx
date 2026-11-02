@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCurrentUser } from "@/lib/auth";
 import { deleteBookRequest } from "@/lib/book-mutations";
-import { hasBorrowed, returnBook, useBorrows } from "@/lib/borrows";
+import { returnBook, useMyBorrows } from "@/lib/borrows";
 import { isBookAddedByUser } from "@/lib/books";
 import type { Book } from "@/lib/books";
 
@@ -54,13 +54,36 @@ export default function BookCard({
   onReturned?: () => void;
 }) {
   const user = useCurrentUser();
-  const borrows = useBorrows();
+  const borrows = useMyBorrows();
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [returning, setReturning] = useState(false);
+  const [returnError, setReturnError] = useState("");
 
-  const borrowedByMe = hasBorrowed(borrows, book._id, user);
+  const myRecord = user
+    ? borrows.find((record) => record.bookId === book._id)
+    : undefined;
+  const borrowedByMe = Boolean(myRecord);
   const isAvailable = book.availableCopies > 0;
   const isOwner = !!user && isBookAddedByUser(book, user);
+
+  async function handleReturn() {
+    if (!myRecord) return;
+    setReturning(true);
+    setReturnError("");
+    try {
+      await returnBook(myRecord._id);
+      onReturned?.();
+    } catch (cause) {
+      setReturnError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not return this book. Please try again.",
+      );
+    } finally {
+      setReturning(false);
+    }
+  }
 
   async function handleDelete() {
     if (!isOwner) return;
@@ -91,7 +114,6 @@ export default function BookCard({
         <div className="absolute inset-0 flex items-center justify-center text-ink/20 dark:text-cream/15">
           <BookIcon className="size-12" />
         </div>
-
         {book.image && (
           // Covers can be data URLs or arbitrary hosts, so next/image cannot
           // optimise them without extra configuration.
@@ -106,7 +128,6 @@ export default function BookCard({
             }}
           />
         )}
-
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-ink-900/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 motion-reduce:transition-none" />
       </div>
 
@@ -165,6 +186,29 @@ export default function BookCard({
           View Details
           <ArrowRightIcon className="size-4" />
         </Link>
+
+        {returnable && borrowedByMe && (
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={handleReturn}
+              disabled={returning}
+              aria-busy={returning}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-sans text-sm font-semibold text-cream transition-colors hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:outline-brand-light"
+            >
+              <ReturnIcon className="size-4" />
+              {returning ? "Returning…" : "Return Book"}
+            </button>
+            {returnError && (
+              <p
+                role="alert"
+                className="mt-2 font-sans text-[11px] leading-relaxed text-brand-dark dark:text-brand-light"
+              >
+                {returnError}
+              </p>
+            )}
+          </div>
+        )}
 
         {manage && isOwner && (
           <div className="mt-2">
@@ -231,6 +275,24 @@ function ArrowRightIcon({ className }: { className?: string }) {
     >
       <path d="M5 12h14" />
       <path d="m13 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function ReturnIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
     </svg>
   );
 }

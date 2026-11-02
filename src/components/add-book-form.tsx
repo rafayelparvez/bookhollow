@@ -4,10 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { useAuth, useMounted } from "@/lib/auth";
+import { API_URL, apiFetch } from "@/lib/api";
 import { BOOK_CATEGORIES } from "@/lib/book-categories";
 import { MAX_IMAGE_BYTES, readFileAsDataUrl } from "@/lib/files";
-
-const ADD_BOOK_ENDPOINT = `/api/books`;
 
 const fieldBase =
   "w-full rounded-lg border border-ink/15 bg-cream font-sans text-sm text-ink outline-none transition placeholder:text-ink/35 hover:border-ink/25 focus:border-brand focus:ring-4 focus:ring-brand/15 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:placeholder:text-cream/35 dark:hover:border-cream/25 dark:focus:border-brand-light dark:focus:ring-brand-light/20";
@@ -47,28 +46,20 @@ export default function AddBookForm() {
         image = await readFileAsDataUrl(file);
       }
 
+      // user info পাঠানো হয় না: server token থেকেই user বের করে।
       const payload = {
         title: formData.get("title"),
         author: formData.get("author"),
         category: formData.get("category"),
-        copies: formData.get("copies"),
+        copies: Number(formData.get("copies")),
         description: formData.get("description"),
         image,
-        // Associate the book with the signed-in account.
-        userId: user.id,
-        userName: user.name,
-        userEmail: user.email,
       };
 
-      const response = await fetch(ADD_BOOK_ENDPOINT, {
+      await apiFetch("/books", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response));
-      }
 
       form.reset();
       setStatus("success");
@@ -219,10 +210,13 @@ export default function AddBookForm() {
           </h2>
 
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <Field id="userName" label="User Name" hint="Taken from your account.">
+            <Field
+              id="userName"
+              label="User Name"
+              hint="Taken from your account."
+            >
               <input
                 id="userName"
-                name="userName"
                 type="text"
                 readOnly
                 value={user.name}
@@ -230,10 +224,13 @@ export default function AddBookForm() {
               />
             </Field>
 
-            <Field id="userEmail" label="User Email" hint="Taken from your account.">
+            <Field
+              id="userEmail"
+              label="User Email"
+              hint="Taken from your account."
+            >
               <input
                 id="userEmail"
-                name="userEmail"
                 type="email"
                 readOnly
                 value={user.email}
@@ -288,31 +285,12 @@ export default function AddBookForm() {
   );
 }
 
-async function readErrorMessage(response: Response): Promise<string> {
-  try {
-    const body: unknown = await response.json();
-
-    if (body && typeof body === "object") {
-      const { message, error } = body as { message?: unknown; error?: unknown };
-      const detail = typeof message === "string" ? message : error;
-
-      if (typeof detail === "string" && detail.trim()) return detail;
-    }
-  } catch {
-    // Non-JSON error body (e.g. an HTML error page) — fall back to the status.
-  }
-
-  return `The server responded with ${response.status} ${response.statusText}.`;
-}
-
 function describeError(error: unknown): string {
   // A CORS or connection failure surfaces as a TypeError from fetch.
   if (error instanceof TypeError) {
-    return `Could not reach the library API at ${ADD_BOOK_ENDPOINT}. Make sure the server is running and allows requests from this site.`;
+    return `Could not reach the library API at ${API_URL}. Make sure the server is running and allows requests from this site.`;
   }
-
   if (error instanceof Error && error.message) return error.message;
-
   return "Something went wrong while adding the book. Please try again.";
 }
 
@@ -324,7 +302,7 @@ function Field({
   className,
   children,
 }: {
-  id: string;
+  id?: string;
   label: string;
   required?: boolean;
   hint?: string;
@@ -346,7 +324,9 @@ function Field({
       </label>
       {children}
       {hint && (
-        <p className="mt-1.5 font-sans text-xs text-ink/45 dark:text-cream/45">{hint}</p>
+        <p className="mt-1.5 font-sans text-xs text-ink/45 dark:text-cream/45">
+          {hint}
+        </p>
       )}
     </div>
   );

@@ -5,12 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useCurrentUser } from "@/lib/auth";
 import { deleteBookRequest } from "@/lib/book-mutations";
-import {
-  borrowBook,
-  borrowsMatchUser,
-  hasBorrowed,
-  useBorrows,
-} from "@/lib/borrows";
+import { borrowBook, useMyBorrows } from "@/lib/borrows";
 import { isBookAddedByUser, useBooks } from "@/lib/books";
 
 const primaryButton =
@@ -28,9 +23,11 @@ export default function BookDetails({ bookId }: { bookId: string }) {
   const router = useRouter();
   const { books, loading, error, retry } = useBooks();
   const user = useCurrentUser();
-  const borrows = useBorrows();
+  const borrows = useMyBorrows();
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [borrowing, setBorrowing] = useState(false);
+  const [borrowError, setBorrowError] = useState("");
 
   if (loading) {
     return (
@@ -83,7 +80,10 @@ export default function BookDetails({ bookId }: { bookId: string }) {
     );
   }
 
-  const borrowedByMe = hasBorrowed(borrows, book._id, user);
+  const myRecord = user
+    ? borrows.find((record) => record.bookId === book._id)
+    : undefined;
+  const borrowedByMe = Boolean(myRecord);
   const isAvailable = book.availableCopies > 0;
   const isOwner = user ? isBookAddedByUser(book, user) : false;
   const target = book;
@@ -111,18 +111,32 @@ export default function BookDetails({ bookId }: { bookId: string }) {
       setDeleting(false);
     }
   }
-  const myRecord = user
-    ? borrows.find(
-        (record) =>
-          record.bookId === book._id && borrowsMatchUser(record, user),
-      )
-    : undefined;
+
+  async function handleBorrow() {
+    setBorrowing(true);
+    setBorrowError("");
+
+    try {
+      await borrowBook(target._id);
+      retry(); // availableCopies নতুন করে আনার জন্য
+    } catch (cause) {
+      setBorrowError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not borrow this book. Please try again.",
+      );
+    } finally {
+      setBorrowing(false);
+    }
+  }
+
   const dueDate = myRecord
     ? new Date(
         new Date(myRecord.borrowedAt).getTime() +
           DAYS_IN_LOAN * 24 * 60 * 60 * 1000,
       )
     : null;
+
   const loginHref = `/login?next=${encodeURIComponent(`/books/${book._id}`)}`;
 
   return (
@@ -132,7 +146,6 @@ export default function BookDetails({ bookId }: { bookId: string }) {
           <div className="absolute inset-0 flex items-center justify-center text-ink/20 dark:text-cream/15">
             <BookIcon className="size-20" />
           </div>
-
           {book.image && (
             // Covers can be data URLs or arbitrary hosts, so next/image cannot
             // optimise them without extra configuration.
@@ -260,16 +273,25 @@ export default function BookDetails({ bookId }: { bookId: string }) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
                 type="button"
-                onClick={() => borrowBook(book._id, user)}
-                disabled={!isAvailable}
+                onClick={handleBorrow}
+                disabled={!isAvailable || borrowing}
+                aria-busy={borrowing}
                 className={primaryButton}
               >
                 <BookIcon className="size-4" />
-                Borrow Book
+                {borrowing ? "Borrowing…" : "Borrow Book"}
               </button>
               {!isAvailable && (
                 <p className="font-sans text-sm text-ink/60 dark:text-cream/60">
                   All copies are currently borrowed. Check back soon.
+                </p>
+              )}
+              {borrowError && (
+                <p
+                  role="alert"
+                  className="font-sans text-sm text-brand-dark dark:text-brand-light"
+                >
+                  {borrowError}
                 </p>
               )}
             </div>

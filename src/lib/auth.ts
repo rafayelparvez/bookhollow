@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { authClient } from "@/lib/auth-client";
+  import { jwt } from "better-auth/plugins";
 
 export type CurrentUser = {
   id: string;

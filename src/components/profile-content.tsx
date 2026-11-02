@@ -3,7 +3,7 @@
 import Link from "next/link";
 import AuthGate from "@/components/auth-gate";
 import { useCurrentUser } from "@/lib/auth";
-import { borrowsMatchUser, useBorrows } from "@/lib/borrows";
+import { useMyBorrows } from "@/lib/borrows";
 import { isBookAddedByUser, useBooks } from "@/lib/books";
 
 export default function ProfileContent() {
@@ -17,14 +17,13 @@ export default function ProfileContent() {
 function ProfileDetails() {
   const user = useCurrentUser();
   const { books } = useBooks();
-  const borrows = useBorrows();
+  const borrows = useMyBorrows();
 
   if (!user) return null;
 
   const addedCount = books.filter((book) => isBookAddedByUser(book, user)).length;
-  const borrowCount = borrows.filter((record) =>
-    borrowsMatchUser(record, user),
-  ).length;
+  // useMyBorrows already returns only the signed-in user's active borrows
+  const borrowCount = borrows.length;
 
   const initials = user.name
     .split(/\s+/)
