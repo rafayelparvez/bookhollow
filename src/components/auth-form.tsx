@@ -13,7 +13,7 @@ const fieldClass =
 const primaryButton =
   "inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand font-sans text-sm font-semibold tracking-wide text-cream transition-colors hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:translate-y-px disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-brand dark:focus-visible:outline-brand-light";
 
-const MIN_PASSWORD_LENGTH = 8;
+const MIN_PASSWORD_LENGTH = 6;
 
 const GOOGLE_AUTH_ENABLED = Boolean(
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim(),
@@ -296,6 +296,24 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
             {!isLogin && (
               <p className="mt-1.5 font-sans text-xs text-ink/45 dark:text-cream/45">
                 Use at least {MIN_PASSWORD_LENGTH} characters.
+              </p>
+            )}
+
+            {isLogin && (
+              <p
+                className="mt-2 text-sm font-sans text-ink/45 dark:text-cream/45"
+                style={{ lineHeight: 1.5 }}
+              >
+                <a
+                  href="#"
+                  className="font-medium text-brand hover:text-brand-dark dark:text-brand-light dark:hover:text-brand-soft"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setError("Password reset isn't available yet — contact an admin.");
+                  }}
+                >
+                  Forgot password?
+                </a>
               </p>
             )}
           </div>
