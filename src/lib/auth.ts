@@ -8,6 +8,8 @@ export type CurrentUser = {
   id: string;
   name: string;
   email: string;
+  /** Profile photo URL, when the reader added one (or Google provided it). */
+  image?: string | null;
 };
 
 export type AuthState = {
@@ -33,6 +35,7 @@ export function useAuth(): AuthState {
           id: data.user.id,
           name: data.user.name,
           email: data.user.email,
+          image: data.user.image ?? null,
         }
       : null,
     isPending,

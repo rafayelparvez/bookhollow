@@ -31,6 +31,7 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [photoUrl, setPhotoUrl] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
@@ -59,6 +60,20 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
       return;
     }
 
+    const trimmedPhoto = photoUrl.trim();
+
+    if (trimmedPhoto) {
+      try {
+        const parsed = new URL(trimmedPhoto);
+        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+          throw new Error("unsupported protocol");
+        }
+      } catch {
+        setError("Please enter a valid photo URL starting with https://.");
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
@@ -71,6 +86,7 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
             name: trimmedName,
             email: trimmedEmail,
             password,
+            ...(trimmedPhoto ? { image: trimmedPhoto } : {}),
           });
 
       if (result.error) {
@@ -199,6 +215,30 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
                 placeholder="e.g. Forhad Hossen"
                 className={fieldClass}
               />
+            </div>
+          )}
+
+          {!isLogin && (
+            <div>
+              <label
+                htmlFor="photoUrl"
+                className="mb-2 block font-sans text-sm font-medium text-ink/80 dark:text-cream/80"
+              >
+                Photo URL
+              </label>
+              <input
+                id="photoUrl"
+                name="photoUrl"
+                type="url"
+                autoComplete="url"
+                value={photoUrl}
+                onChange={(event) => setPhotoUrl(event.target.value)}
+                placeholder="https://example.com/your-photo.jpg"
+                className={fieldClass}
+              />
+              <p className="mt-1.5 font-sans text-xs text-ink/45 dark:text-cream/45">
+                Optional. Shown on your profile and in the navbar.
+              </p>
             </div>
           )}
 

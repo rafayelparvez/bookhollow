@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import AuthGate from "@/components/auth-gate";
+import UserAvatar from "@/components/user-avatar";
 import { useCurrentUser } from "@/lib/auth";
 import { useMyBorrows } from "@/lib/borrows";
 import { isBookAddedByUser, useBooks } from "@/lib/books";
@@ -50,9 +51,14 @@ function ProfileDetails() {
         <div className="h-1 w-full bg-linear-to-r from-brand via-brand-light to-brand-soft" />
 
         <div className="flex flex-col items-center gap-5 p-6 text-center sm:flex-row sm:items-center sm:p-8 sm:text-left">
-          <span className="flex size-20 shrink-0 items-center justify-center rounded-full bg-brand font-sans text-2xl font-bold text-cream">
-            {initials || "?"}
-          </span>
+          <UserAvatar
+            src={user.image}
+            name={user.name}
+            initials={initials || undefined}
+            className="size-20"
+            textClassName="text-2xl"
+            alt={`Profile photo of ${user.name}`}
+          />
           <div className="min-w-0">
             <h2 className="truncate text-3xl font-bold text-ink dark:text-cream">
               {user.name}

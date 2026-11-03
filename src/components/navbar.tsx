@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import ThemeToggle from "@/components/theme-toggle";
+import UserAvatar from "@/components/user-avatar";
 import { useAuth, useMounted } from "@/lib/auth";
 
 const baseLinks = [
@@ -61,7 +62,6 @@ export default function Navbar() {
   }, []);
 
   const links = user ? [...baseLinks, ...memberLinks] : baseLinks;
-  const initial = user?.name.trim().charAt(0).toUpperCase() ?? "";
 
   return (
     <header className="sticky top-0 z-50 border-b border-cream/10 bg-ink-900 dark:bg-ink">
@@ -120,9 +120,12 @@ export default function Navbar() {
                   pathname === "/profile" ? "text-brand-light" : "text-cream"
                 }`}
               >
-                <span className="flex size-6 items-center justify-center rounded-full bg-brand font-sans text-[11px] font-bold text-cream">
-                  {initial}
-                </span>
+                <UserAvatar
+                  src={user.image}
+                  name={user.name}
+                  className="size-6"
+                  textClassName="text-[11px]"
+                />
                 Profile
               </Link>
 
@@ -184,9 +187,12 @@ export default function Navbar() {
         <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4 font-sans sm:px-6">
           {user && (
             <div className="mb-2 flex items-center gap-3 rounded-lg border border-cream/10 px-3 py-3">
-              <span className="flex size-9 items-center justify-center rounded-full bg-brand font-sans text-sm font-bold text-cream">
-                {initial}
-              </span>
+              <UserAvatar
+                src={user.image}
+                name={user.name}
+                className="size-9"
+                textClassName="text-sm"
+              />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-cream">
                   {user.name}
