@@ -8,10 +8,13 @@ import { jwtClient } from "better-auth/client/plugins";
  * the API route in `src/app/api/auth/[...all]`, so components read state
  * through `useSession()` (wrapped by `useAuth()` in `src/lib/auth.ts`).
  *
+ * No `baseURL` on purpose: the auth API lives in this same Next.js app, so the
+ * client calls its own origin. (The Express API is a separate server and does
+ * not serve /api/auth.)
+ *
  * `jwtClient()` adds `authClient.token()`, which returns a JWT that the
  * Express API verifies on protected routes.
  */
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_APP_URL,
   plugins: [jwtClient()],
 });
