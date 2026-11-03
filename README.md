@@ -225,4 +225,10 @@ curl -i $API/borrows -H "Authorization: Bearer abc.def.ghi"   # 401, invalid tok
 
 ---
 
+## 👤 Author
+
+**Parvez Mosharaf**: designed and built BookHollow (frontend, API and deployment).
+
+---
+
 Made with ☕ and a love of books.
