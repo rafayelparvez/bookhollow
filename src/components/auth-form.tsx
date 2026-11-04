@@ -19,6 +19,20 @@ const GOOGLE_AUTH_ENABLED = Boolean(
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim(),
 );
 
+/** Register-only rules: min length + one uppercase + one lowercase letter. */
+function getPasswordError(value: string): string {
+  if (value.length < MIN_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`;
+  }
+  if (!/[A-Z]/.test(value)) {
+    return "Password must include at least one uppercase letter.";
+  }
+  if (!/[a-z]/.test(value)) {
+    return "Password must include at least one lowercase letter.";
+  }
+  return "";
+}
+
 const googleButton =
   "mt-3 inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-ink/15 bg-cream font-sans text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-70 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:hover:border-brand-light/40 dark:hover:bg-brand/10 dark:hover:text-brand-light dark:focus-visible:outline-brand-light";
 
@@ -31,6 +45,7 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -39,6 +54,7 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setPasswordError("");
 
     const trimmedEmail = email.trim();
     const trimmedName = name.trim();
@@ -48,7 +64,13 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
       return;
     }
 
-    if (password.length < MIN_PASSWORD_LENGTH) {
+    if (!isLogin) {
+      const passwordProblem = getPasswordError(password);
+      if (passwordProblem) {
+        setPasswordError(passwordProblem);
+        return;
+      }
+    } else if (password.length < MIN_PASSWORD_LENGTH) {
       setError(
         `Your password must be at least ${MIN_PASSWORD_LENGTH} characters long.`,
       );
@@ -286,16 +308,31 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
               name="password"
               type="password"
               required
-              minLength={MIN_PASSWORD_LENGTH}
               autoComplete={isLogin ? "current-password" : "new-password"}
+              aria-invalid={!isLogin && passwordError ? true : undefined}
+              aria-describedby={
+                !isLogin && passwordError ? "password-error" : undefined
+              }
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder={isLogin ? "Your password" : "At least 8 characters"}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setPasswordError("");
+              }}
+              placeholder={isLogin ? "Your password" : "At least 6 characters"}
               className={fieldClass}
             />
             {!isLogin && (
               <p className="mt-1.5 font-sans text-xs text-ink/45 dark:text-cream/45">
-                Use at least {MIN_PASSWORD_LENGTH} characters.
+                Use at least {MIN_PASSWORD_LENGTH} characters, with one uppercase and one lowercase letter.
+              </p>
+            )}
+            {!isLogin && passwordError && (
+              <p
+                id="password-error"
+                role="alert"
+                className="mt-1.5 font-sans text-xs font-medium text-brand-dark dark:text-brand-light"
+              >
+                {passwordError}
               </p>
             )}
 

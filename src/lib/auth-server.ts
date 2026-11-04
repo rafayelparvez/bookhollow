@@ -5,6 +5,9 @@ import { db, mongoClient } from "@/lib/mongo";
 
 const googleClientId =
   process.env.GOOGLE_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+// Keep in sync with MIN_PASSWORD_LENGTH in src/components/auth-form.tsx.
+const MIN_PASSWORD_LENGTH = 6;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
 const socialProviders =
@@ -23,6 +26,9 @@ export const auth = betterAuth({
   database: mongodbAdapter(db, { client: mongoClient }),
   emailAndPassword: {
     enabled: true,
+    // Match the client-side rule; Better Auth otherwise defaults to 8.
+    // Uppercase/lowercase are enforced by the register form only.
+    minPasswordLength: MIN_PASSWORD_LENGTH,
   },
   ...(socialProviders ? { socialProviders } : {}),
   session: {

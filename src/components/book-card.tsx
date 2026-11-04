@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useCurrentUser } from "@/lib/auth";
-import { deleteBookRequest } from "@/lib/book-mutations";
+import DeleteBookModal from "@/components/delete-book-modal";
 import { returnBook, useMyBorrows } from "@/lib/borrows";
 import { isBookAddedByUser } from "@/lib/books";
 import type { Book } from "@/lib/books";
@@ -55,8 +55,7 @@ export default function BookCard({
 }) {
   const user = useCurrentUser();
   const borrows = useMyBorrows();
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [returning, setReturning] = useState(false);
   const [returnError, setReturnError] = useState("");
 
@@ -82,29 +81,6 @@ export default function BookCard({
       );
     } finally {
       setReturning(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!isOwner) return;
-    if (!window.confirm(`Delete "${book.title}"? This cannot be undone.`)) {
-      return;
-    }
-
-    setDeleting(true);
-    setDeleteError("");
-
-    try {
-      await deleteBookRequest(book._id);
-      onDeleted?.();
-    } catch (cause) {
-      setDeleteError(
-        cause instanceof Error
-          ? cause.message
-          : "Could not delete this book. Please try again.",
-      );
-    } finally {
-      setDeleting(false);
     }
   }
 
@@ -221,22 +197,22 @@ export default function BookCard({
               </Link>
               <button
                 type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="inline-flex items-center justify-center rounded-lg border border-brand/25 bg-brand/5 px-3 py-2 font-sans text-xs font-semibold text-brand-dark transition-colors hover:bg-brand/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-60 dark:border-brand-light/25 dark:bg-brand/10 dark:text-brand-light dark:hover:bg-brand/15 dark:focus-visible:outline-brand-light"
+                onClick={() => setConfirmingDelete(true)}
+                className="inline-flex items-center justify-center rounded-lg border border-brand/25 bg-brand/5 px-3 py-2 font-sans text-xs font-semibold text-brand-dark transition-colors hover:bg-brand/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:border-brand-light/25 dark:bg-brand/10 dark:text-brand-light dark:hover:bg-brand/15 dark:focus-visible:outline-brand-light"
               >
-                {deleting ? "Deleting…" : "Delete"}
+                Delete
               </button>
             </div>
-            {deleteError && (
-              <p
-                role="alert"
-                className="mt-2 font-sans text-[11px] leading-relaxed text-brand-dark dark:text-brand-light"
-              >
-                {deleteError}
-              </p>
-            )}
           </div>
+        )}
+
+        {confirmingDelete && (
+          <DeleteBookModal
+            bookId={book._id}
+            bookTitle={book.title}
+            onClose={() => setConfirmingDelete(false)}
+            onDeleted={() => onDeleted?.()}
+          />
         )}
       </div>
     </article>

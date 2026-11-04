@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useCurrentUser } from "@/lib/auth";
-import { deleteBookRequest } from "@/lib/book-mutations";
+import DeleteBookModal from "@/components/delete-book-modal";
+import Modal from "@/components/modal";
 import { borrowBook, useMyBorrows } from "@/lib/borrows";
 import { isBookAddedByUser, useBooks } from "@/lib/books";
 
@@ -19,13 +20,19 @@ const dangerButton =
 
 const DAYS_IN_LOAN = 7;
 
+const readOnlyField =
+  "h-11 w-full cursor-default rounded-lg border border-ink/15 bg-ink/[0.04] px-3.5 font-sans text-sm text-ink/75 outline-none dark:border-cream/10 dark:bg-cream/5 dark:text-cream/75";
+
+const LABEL_CLASS =
+  "mb-2 block font-sans text-sm font-medium text-ink/80 dark:text-cream/80";
+
 export default function BookDetails({ bookId }: { bookId: string }) {
   const router = useRouter();
   const { books, loading, error, retry } = useBooks();
   const user = useCurrentUser();
   const borrows = useMyBorrows();
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [borrowModalOpen, setBorrowModalOpen] = useState(false);
   const [borrowing, setBorrowing] = useState(false);
   const [borrowError, setBorrowError] = useState("");
 
@@ -88,36 +95,13 @@ export default function BookDetails({ bookId }: { bookId: string }) {
   const isOwner = user ? isBookAddedByUser(book, user) : false;
   const target = book;
 
-  async function handleDelete() {
-    if (!isOwner) return;
-    if (!window.confirm(`Delete "${target.title}"? This cannot be undone.`)) {
-      return;
-    }
-
-    setDeleting(true);
-    setDeleteError("");
-
-    try {
-      await deleteBookRequest(target._id);
-      router.replace("/my-books");
-      router.refresh();
-    } catch (cause) {
-      setDeleteError(
-        cause instanceof Error
-          ? cause.message
-          : "Could not delete this book. Please try again.",
-      );
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  async function handleBorrow() {
+  async function handleConfirmBorrow() {
     setBorrowing(true);
     setBorrowError("");
 
     try {
       await borrowBook(target._id);
+      setBorrowModalOpen(false);
       retry(); // availableCopies নতুন করে আনার জন্য
     } catch (cause) {
       setBorrowError(
@@ -273,25 +257,19 @@ export default function BookDetails({ bookId }: { bookId: string }) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
                 type="button"
-                onClick={handleBorrow}
-                disabled={!isAvailable || borrowing}
-                aria-busy={borrowing}
+                onClick={() => {
+                  setBorrowError("");
+                  setBorrowModalOpen(true);
+                }}
+                disabled={!isAvailable}
                 className={primaryButton}
               >
                 <BookIcon className="size-4" />
-                {borrowing ? "Borrowing…" : "Borrow Book"}
+                Borrow Book
               </button>
               {!isAvailable && (
                 <p className="font-sans text-sm text-ink/60 dark:text-cream/60">
                   All copies are currently borrowed. Check back soon.
-                </p>
-              )}
-              {borrowError && (
-                <p
-                  role="alert"
-                  className="font-sans text-sm text-brand-dark dark:text-brand-light"
-                >
-                  {borrowError}
                 </p>
               )}
             </div>
@@ -309,24 +287,106 @@ export default function BookDetails({ bookId }: { bookId: string }) {
               </Link>
               <button
                 type="button"
-                onClick={handleDelete}
-                disabled={deleting}
+                onClick={() => setConfirmingDelete(true)}
                 className={dangerButton}
               >
-                {deleting ? "Deleting…" : "Delete book"}
+                Delete book
               </button>
             </div>
-            {deleteError && (
-              <p
-                role="alert"
-                className="mt-3 font-sans text-sm text-brand-dark dark:text-brand-light"
-              >
-                {deleteError}
-              </p>
-            )}
           </div>
         )}
       </div>
+
+      {borrowModalOpen && user && (
+        <Modal
+          title="Borrow this book"
+          onClose={() => {
+            if (!borrowing) setBorrowModalOpen(false);
+          }}
+        >
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            void handleConfirmBorrow();
+          }}>
+            <p className="font-sans text-sm leading-relaxed text-ink/70 dark:text-cream/70">
+              You&apos;re about to borrow{" "}
+              <span className="font-semibold text-ink dark:text-cream">
+                “{book.title}”
+              </span>
+              . It will be due back in {DAYS_IN_LOAN} days.
+            </p>
+
+            <div className="mt-5 space-y-4">
+              <div>
+                <label htmlFor="borrow-name" className={LABEL_CLASS}>
+                  User name
+                </label>
+                <input
+                  id="borrow-name"
+                  name="name"
+                  type="text"
+                  readOnly
+                  value={user.name}
+                  className={readOnlyField}
+                />
+              </div>
+              <div>
+                <label htmlFor="borrow-email" className={LABEL_CLASS}>
+                  Email
+                </label>
+                <input
+                  id="borrow-email"
+                  name="email"
+                  type="email"
+                  readOnly
+                  value={user.email}
+                  className={readOnlyField}
+                />
+              </div>
+            </div>
+
+            {borrowError && (
+              <p
+                role="alert"
+                className="mt-4 rounded-lg border border-brand/30 bg-brand/5 px-4 py-3 font-sans text-sm text-ink/80 dark:border-brand-light/30 dark:bg-brand/10 dark:text-cream/80"
+              >
+                {borrowError}
+              </p>
+            )}
+
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setBorrowModalOpen(false)}
+                disabled={borrowing}
+                className={secondaryButton}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={borrowing}
+                aria-busy={borrowing}
+                className={primaryButton}
+              >
+                {borrowing ? "Borrowing…" : "Confirm Borrow"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {confirmingDelete && (
+        <DeleteBookModal
+          bookId={book._id}
+          bookTitle={book.title}
+          onClose={() => setConfirmingDelete(false)}
+          onDeleted={() => {
+            router.replace("/my-books");
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
