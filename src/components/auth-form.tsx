@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
+import { MIN_PASSWORD_LENGTH, getPasswordError } from "@/lib/password";
 import { useAuth, useMounted } from "@/lib/auth";
 
 const fieldClass =
@@ -13,25 +14,9 @@ const fieldClass =
 const primaryButton =
   "inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand font-sans text-sm font-semibold tracking-wide text-cream transition-colors hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:translate-y-px disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-brand dark:focus-visible:outline-brand-light";
 
-const MIN_PASSWORD_LENGTH = 6;
-
 const GOOGLE_AUTH_ENABLED = Boolean(
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim(),
 );
-
-/** Register-only rules: min length + one uppercase + one lowercase letter. */
-function getPasswordError(value: string): string {
-  if (value.length < MIN_PASSWORD_LENGTH) {
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`;
-  }
-  if (!/[A-Z]/.test(value)) {
-    return "Password must include at least one uppercase letter.";
-  }
-  if (!/[a-z]/.test(value)) {
-    return "Password must include at least one lowercase letter.";
-  }
-  return "";
-}
 
 const googleButton =
   "mt-3 inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-ink/15 bg-cream font-sans text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-70 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:hover:border-brand-light/40 dark:hover:bg-brand/10 dark:hover:text-brand-light dark:focus-visible:outline-brand-light";

@@ -1,13 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import AuthGate from "@/components/auth-gate";
 import UserAvatar from "@/components/user-avatar";
+import { authClient } from "@/lib/auth-client";
 import { useCurrentUser } from "@/lib/auth";
-import { useState } from "react";
 import { useMyBorrows } from "@/lib/borrows";
 import { isBookAddedByUser, useBooks } from "@/lib/books";
-import SaveButton from "@/components/save-button";
+import { isHttpUrl } from "@/lib/files";
+import { getPasswordError } from "@/lib/password";
+import type { CurrentUser } from "@/lib/auth";
 
 export default function ProfileContent() {
   return (
@@ -17,13 +22,23 @@ export default function ProfileContent() {
   );
 }
 
+const fieldClass =
+  "h-11 w-full rounded-lg border border-ink/15 bg-cream px-3.5 font-sans text-sm text-ink outline-none transition placeholder:text-ink/35 hover:border-ink/25 focus:border-brand focus:ring-4 focus:ring-brand/15 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:placeholder:text-cream/35 dark:hover:border-cream/25 dark:focus:border-brand-light dark:focus:ring-brand-light/20";
+
+const labelClass =
+  "mb-2 block font-sans text-sm font-medium text-ink/80 dark:text-cream/80";
+
 function ProfileDetails() {
   const user = useCurrentUser();
   const { books } = useBooks();
   const borrows = useMyBorrows();
   const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  const handleSave = () => setEditing(false);
+  const handleSave = () => {
+    setEditing(false);
+    setSaved(true);
+  };
   const handleCancel = () => setEditing(false);
 
   if (!user) return null;
@@ -57,35 +72,41 @@ function ProfileDetails() {
         <div className="h-1 w-full bg-linear-to-r from-brand via-brand-light to-brand-soft" />
 
         <div className="flex flex-col items-center gap-5 p-6 text-center sm:flex-row sm:items-center sm:p-8 sm:text-left">
-          {editing ? (
-            <EditProfileForm user={user} onSave={handleSave} onCancel={handleCancel} />
-          ) : (
-            <UserAvatar
-              src={user.image}
-              name={user.name}
-              initials={initials || undefined}
-              className="size-20"
-              textClassName="text-2xl"
-              alt={`Profile photo of ${user.name}`}
-            />
-          )}
+          <UserAvatar
+            src={user.image}
+            name={user.name}
+            initials={initials || undefined}
+            className="size-20"
+            textClassName="text-2xl"
+            alt={`Profile photo of ${user.name}`}
+          />
           <div className="min-w-0">
-            {editing ? (
-              <SaveButton onSave={handleSave} />
-            ) : (
-              <h2 className="truncate text-3xl font-bold text-ink dark:text-cream">
-                {user.name}
-              </h2>
-            )}
+            <h2 className="truncate text-3xl font-bold text-ink dark:text-cream">
+              {user.name}
+            </h2>
             <p className="mt-1 truncate font-sans text-sm text-ink/55 dark:text-cream/55">
               {user.email}
             </p>
-            <button
-              onClick={() => setEditing(true)}
-              className="mt-2 inline-flex items-center rounded-lg border border-brand/25 bg-brand/5 px-4 py-1.5 font-sans text-sm font-medium text-brand-dark transition-colors hover:bg-brand/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:border-brand-light/25 dark:bg-brand/10 dark:text-brand-light dark:hover:bg-brand/10 dark:hover:text-brand-light dark:focus-visible:outline-brand-light"
-            >
-              Edit profile
-            </button>
+            {saved && !editing && (
+              <p
+                role="status"
+                className="mt-2 inline-flex items-center gap-1.5 font-sans text-xs font-medium text-brand-dark dark:text-brand-light"
+              >
+                <CheckIcon className="size-4" />
+                Profile updated.
+              </p>
+            )}
+            {!editing && (
+              <button
+                onClick={() => {
+                  setSaved(false);
+                  setEditing(true);
+                }}
+                className="mt-2 inline-flex items-center rounded-lg border border-brand/25 bg-brand/5 px-4 py-1.5 font-sans text-sm font-medium text-brand-dark transition-colors hover:bg-brand/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:border-brand-light/25 dark:bg-brand/10 dark:text-brand-light dark:hover:bg-brand/10 dark:hover:text-brand-light dark:focus-visible:outline-brand-light"
+              >
+                Edit profile
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -135,7 +156,9 @@ function ProfileDetails() {
         </div>
       </section>
 
-      <EditProfileForm user={user} onSave={handleSave} onCancel={handleCancel} />
+      {editing && (
+        <EditProfileForm user={user} onSave={handleSave} onCancel={handleCancel} />
+      )}
     </div>
   );
 }
@@ -145,82 +168,98 @@ function EditProfileForm({
   onSave,
   onCancel,
 }: {
-  user: import("@/lib/auth").CurrentUser;
-  onSave: (() => void) | undefined;
-  onCancel: (() => void) | undefined;
+  user: CurrentUser;
+  onSave: () => void;
+  onCancel: () => void;
 }) {
+  const router = useRouter();
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [photoUrl, setPhotoUrl] = useState(user.image ?? "");
-  const [password, setPassword] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSave = async () => {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError("");
+
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedPhoto = photoUrl.trim();
+
+    if (!trimmedName) {
+      setError("Please enter your full name.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (trimmedPhoto && !isHttpUrl(trimmedPhoto)) {
+      setError("Please enter a valid photo URL starting with http:// or https://.");
+      return;
+    }
+
+    // Passwords are intentionally not trimmed — spaces can be significant.
+    const passwordRequested = newPassword.length > 0 || currentPassword.length > 0;
+    if (passwordRequested) {
+      if (!currentPassword) {
+        setError("Enter your current password to set a new one.");
+        return;
+      }
+      const passwordProblem = getPasswordError(newPassword);
+      if (passwordProblem) {
+        setError(passwordProblem);
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
-      const trimmedName = name.trim();
-      const trimmedEmail = email.trim();
-      const trimmedPhoto = photoUrl.trim();
-
-      // Validate email format
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-        setError("Please enter a valid email address.");
-        setSubmitting(false);
-        return;
-      }
-
-      // Validate password if provided
-      const passwordValue = password.trim();
-      if (passwordValue) {
-        const hasUpperCase = /[A-Z]/.test(passwordValue);
-        const hasLowerCase = /[a-z]/.test(passwordValue);
-        const minLength = passwordValue.length >= 6;
-
-        if (!hasUpperCase) {
-          setError(
-            "Password must contain at least one uppercase letter.",
-          );
-          setSubmitting(false);
-          return;
-        }
-        if (!hasLowerCase) {
-          setError(
-            "Password must contain at least one lowercase letter.",
-          );
-          setSubmitting(false);
-          return;
-        }
-        if (!minLength) {
-          setError("Password must be at least 6 characters long.");
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      // Build update payload
-      const payload: Record<string, string | null | undefined> = {};
-      if (trimmedName) payload.name = trimmedName;
-      if (trimmedEmail) payload.email = trimmedEmail;
-      if (trimmedPhoto) payload.image = trimmedPhoto;
-
-      // If password is provided, also change it
-      if (passwordValue) {
-        // TODO: Implement actual password change via Better Auth changePassword API
-        setError(
-          "Password change feature coming soon. For now, your password remains unchanged.",
+      // 1) Name + photo. (Empty URL clears the photo.)
+      const updateResult = await authClient.updateUser({
+        name: trimmedName,
+        image: trimmedPhoto || null,
+      });
+      if (updateResult.error) {
+        throw new Error(
+          updateResult.error.message ?? "Could not update your profile.",
         );
-        setSubmitting(false);
-        // Don't set payload.password - we'll handle this separately
       }
 
-      // Call Better Auth updateUser
-      // Note: The actual updateUser API call would go here
-      // For now, just simulate success
-      onSave?.();
+      // 2) Email change (optional). No verification service is configured,
+      // so the change applies immediately for unverified accounts.
+      if (trimmedEmail.toLowerCase() !== user.email.toLowerCase()) {
+        const emailResult = await authClient.changeEmail({ newEmail: trimmedEmail });
+        if (emailResult?.error) {
+          throw new Error(
+            emailResult.error.message ?? "Could not change your email address.",
+          );
+        }
+      }
+
+      // 3) Password change (optional).
+      if (passwordRequested) {
+        const passwordResult = await authClient.changePassword({
+          currentPassword,
+          newPassword,
+          revokeOtherSessions: false,
+        });
+        if (passwordResult.error) {
+          throw new Error(
+            passwordResult.error.message ??
+              "Could not change your password. Check your current password.",
+          );
+        }
+      }
+
+      setCurrentPassword("");
+      setNewPassword("");
+      router.refresh();
+      onSave();
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -230,21 +269,15 @@ function EditProfileForm({
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleCancel = () => {
-    setName(user.name);
-    setEmail(user.email);
-    setPhotoUrl(user.image ?? "");
-    setPassword("");
-    setCurrentPassword("");
-    onCancel?.();
-  };
+  }
 
   return (
-    <div className="mt-6 rounded-2xl border border-ink/10 bg-cream p-6 dark:border-cream/10 dark:bg-ink">
+    <form
+      onSubmit={handleSubmit}
+      className="mt-6 rounded-2xl border border-ink/10 bg-cream p-6 shadow-sm dark:border-cream/10 dark:bg-ink"
+    >
       <h2 className="font-sans text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/45 dark:text-cream/45">
-        Edit Profile
+        Edit profile
       </h2>
 
       {error && (
@@ -258,7 +291,7 @@ function EditProfileForm({
 
       <div className="mt-4 space-y-4">
         <div>
-          <label htmlFor="name" className="mb-2 block font-sans text-sm font-medium text-ink/80 dark:text-cream/80">
+          <label htmlFor="name" className={labelClass}>
             Full name
             <span className="ml-0.5 text-brand dark:text-brand-light" aria-hidden="true">
               *
@@ -273,12 +306,12 @@ function EditProfileForm({
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="e.g. Forhad Hossen"
-            className="h-11 w-full rounded-lg border border-ink/15 bg-cream px-3.5 font-sans text-sm text-ink outline-none transition placeholder:text-ink/35 hover:border-ink/25 focus:border-brand focus:ring-4 focus:ring-brand/15 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:placeholder:text-cream/35 dark:hover:border-cream/25 dark:focus:border-brand-light dark:focus:ring-brand-light/20"
+            className={fieldClass}
           />
         </div>
 
         <div>
-          <label htmlFor="email" className="mb-2 block font-sans text-sm font-medium text-ink/80 dark:text-cream/80">
+          <label htmlFor="email" className={labelClass}>
             Email address
             <span className="ml-0.5 text-brand dark:text-brand-light" aria-hidden="true">
               *
@@ -293,12 +326,15 @@ function EditProfileForm({
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
-            className="h-11 w-full rounded-lg border border-ink/15 bg-cream px-3.5 font-sans text-sm text-ink outline-none transition placeholder:text-ink/35 hover:border-ink/25 focus:border-brand focus:ring-4 focus:ring-brand/15 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:placeholder:text-cream/35 dark:hover:border-cream/25 dark:focus:border-brand-light dark:focus:ring-brand-light/20"
+            className={fieldClass}
           />
+          <p className="mt-1.5 font-sans text-xs text-ink/45 dark:text-cream/45">
+            A new email address takes effect immediately.
+          </p>
         </div>
 
         <div>
-          <label htmlFor="photoUrl" className="mb-2 block font-sans text-sm font-medium text-ink/80 dark:text-cream/80">
+          <label htmlFor="photoUrl" className={labelClass}>
             Photo URL
           </label>
           <input
@@ -309,16 +345,17 @@ function EditProfileForm({
             value={photoUrl}
             onChange={(event) => setPhotoUrl(event.target.value)}
             placeholder="https://example.com/your-photo.jpg"
-            className="h-11 w-full rounded-lg border border-ink/15 bg-cream px-3.5 font-sans text-sm text-ink outline-none transition placeholder:text-ink/35 hover:border-ink/25 focus:border-brand focus:ring-4 focus:ring-brand/15 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:placeholder:text-cream/35 dark:hover:border-cream/25 dark:focus:border-brand-light dark:focus:ring-brand-light/20"
+            className={fieldClass}
           />
           <p className="mt-1.5 font-sans text-xs text-ink/45 dark:text-cream/45">
-            Optional. Shown on your profile and in the navbar.
+            Optional. Shown on your profile and in the navbar. Leave empty to
+            remove your photo.
           </p>
         </div>
 
         <div>
-          <label htmlFor="currentPassword" className="mb-2 block font-sans text-sm font-medium text-ink/80 dark:text-cream/80">
-            Current password (for password change)
+          <label htmlFor="currentPassword" className={labelClass}>
+            Current password
           </label>
           <input
             id="currentPassword"
@@ -328,15 +365,15 @@ function EditProfileForm({
             value={currentPassword}
             onChange={(event) => setCurrentPassword(event.target.value)}
             placeholder="Enter your current password"
-            className="h-11 w-full rounded-lg border border-ink/15 bg-cream px-3.5 font-sans text-sm text-ink outline-none transition placeholder:text-ink/35 hover:border-ink/25 focus:border-brand focus:ring-4 focus:ring-brand/15 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:placeholder:text-cream/35 dark:hover:border-cream/25 dark:focus:border-brand-light dark:focus:ring-brand-light/20"
+            className={fieldClass}
           />
           <p className="mt-1.5 font-sans text-xs text-ink/45 dark:text-cream/45">
-            Leave blank if you do not want to change your password.
+            Required only if you set a new password.
           </p>
         </div>
 
         <div>
-          <label htmlFor="newPassword" className="mb-2 block font-sans text-sm font-medium text-ink/80 dark:text-cream/80">
+          <label htmlFor="newPassword" className={labelClass}>
             New password
           </label>
           <input
@@ -344,33 +381,31 @@ function EditProfileForm({
             name="newPassword"
             type="password"
             autoComplete="new-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="At least 8 characters"
-            className="h-11 w-full rounded-lg border border-ink/15 bg-cream px-3.5 font-sans text-sm text-ink outline-none transition placeholder:text-ink/35 hover:border-ink/25 focus:border-brand focus:ring-4 focus:ring-brand/15 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:placeholder:text-cream/35 dark:hover:border-cream/25 dark:focus:border-brand-light dark:focus:ring-brand-light/20"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            placeholder="At least 6 characters"
+            className={fieldClass}
           />
           <p className="mt-1.5 font-sans text-xs text-ink/45 dark:text-cream/45">
-            Password must be at least 8 characters.
+            At least 6 characters, with one uppercase and one lowercase letter.
           </p>
         </div>
       </div>
 
-      <div className="mt-6 flex gap-3">
+      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button
           type="button"
-          onClick={handleCancel}
+          onClick={onCancel}
           disabled={submitting}
-          aria-busy={submitting}
-          className="flex-1 rounded-lg border border-ink/15 bg-cream px-5 py-2.5 font-sans text-sm font-medium text-ink transition-colors hover:bg-cream/10 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:hover:border-cream/25 dark:hover:text-cream dark:focus-visible:outline-brand-light"
+          className="inline-flex items-center justify-center rounded-lg border border-ink/15 bg-cream px-5 py-2.5 font-sans text-sm font-medium text-ink transition-colors hover:bg-cream/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-60 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:hover:border-cream/25 dark:focus-visible:outline-brand-light"
         >
           Cancel
         </button>
         <button
           type="submit"
-          onClick={handleSave}
           disabled={submitting}
           aria-busy={submitting}
-          className="flex-1 rounded-lg bg-brand px-5 py-2.5 font-sans text-sm font-medium text-cream transition-colors hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:translate-y-px disabled:cursor-not-allowed disabled:opacity-70 dark:focus-visible:outline-brand-light"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-2.5 font-sans text-sm font-medium text-cream transition-colors hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:translate-y-px disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-brand dark:focus-visible:outline-brand-light"
         >
           {submitting ? (
             <>
@@ -382,7 +417,24 @@ function EditProfileForm({
           )}
         </button>
       </div>
-    </div>
+    </form>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
   );
 }
 

@@ -48,8 +48,8 @@ There is no test suite. Verify changes with `npm run build` and `npm run lint`.
 ## Project layout
 
 - `src/app/` — App Router routes. Pages: `/`, `/books`, `/books/[id]`, `/books/[id]/edit`, `/add-book`, `/my-books`, `/my-borrows`, `/profile`, `/login`, `/register`, `/logout`. API: `/api/auth/[...all]` (Better Auth), `/api/books` (`GET`/`POST`), `/api/add-book` (`POST`, re-exports the `books` POST handler), `/api/books/[id]` (`PUT`/`DELETE`).
-- `src/components/` — client components. `book-card.tsx` exports `BOOK_GRID_CLASS` and `BookGrid`.
-- `src/lib/` — data/auth helpers: `books.ts` (`useBooks`), `borrows.ts`, `api.ts` (`API_URL` + `apiFetch`), `auth.ts` (client session facade), `auth-client.ts`, `auth-server.ts`, `mongo.ts`, `book-mutations.ts`, `book-ownership.ts`, `book-categories.ts`, `files.ts`.
+- `src/components/` — client components. `book-card.tsx` exports `BOOK_GRID_CLASS` and `BookGrid`. `modal.tsx` + `delete-book-modal.tsx` are the shared portaled dialogs.
+- `src/lib/` — data/auth helpers: `books.ts` (`useBooks`), `borrows.ts`, `api.ts` (`API_URL` + `apiFetch`), `auth.ts` (client session facade), `auth-client.ts`, `auth-server.ts`, `mongo.ts`, `book-mutations.ts`, `book-ownership.ts`, `book-categories.ts`, `password.ts` (shared register password rules), `files.ts` (`isHttpUrl`).
 - `scripts/reset-users.mjs` — maintenance script. `scripts/.probe-db.mjs` — hidden, temporary diagnostic comparing frontend/backend Mongo URIs (references a sibling server repo); not routine tooling.
 - `public/images/` — logos and banners.
 
@@ -65,7 +65,9 @@ Two API surfaces exist side by side; check both before changing book/borrow beha
 - Ownership: a book belongs to a user when `addedBy.id` or `addedBy.email` matches (`bookBelongsToUser`). The internal `PUT`/`DELETE` routes enforce this server-side (403/401); the Express API enforces the same rule for `PATCH`/`DELETE`.
 - Borrows are **not** stored in localStorage anymore. `src/lib/borrows.ts` keeps a module-level in-memory store consumed with `useSyncExternalStore`; `refreshBorrows()` loads `GET /borrows`, and `normalize()` maps server field names (`borrowDate` → `borrowedAt`, `returnDate` → `dueAt`) and hides returned records. `borrowBook`/`returnBook` POST/DELETE then re-fetch. (Some comments in this file are in Bengali.)
 - Theming: Tailwind dark mode via `dark` class on `<html>`, set before paint by an inline script in `layout.tsx` from `localStorage["bookhollow:theme"]` (falls back to system preference).
-- Images: uploads are converted to base64 data URLs client-side (`readFileAsDataUrl`), max 2 MB (`MAX_IMAGE_BYTES`); `http(s)` image URLs are also accepted. Both are stored on the book document.
+- Images are referenced by URL: both book forms and the profile photo take an absolute http(s) URL, validated client-side with `isHttpUrl` (`src/lib/files.ts`). There is no upload/base64 flow. Existing books with stored data-URL covers still render, but the edit form won't prefill them into the URL field.
+- Favicon: `src/app/icon.png` (App Router icon convention, copied from `public/images/bookhollow-icon-dark.png`).
+- Email changes: Better Auth is configured with `user.changeEmail` (enabled + `updateEmailWithoutVerification` in `auth-server.ts`) because no email-verification service exists; email updates apply immediately for unverified accounts. Verified (e.g. Google) accounts cannot change email.
 
 ## Conventions
 

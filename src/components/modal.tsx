@@ -22,7 +22,11 @@ export default function Modal({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   const canPortal = typeof document !== "undefined";
 
   useEffect(() => {

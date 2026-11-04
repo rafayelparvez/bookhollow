@@ -6,7 +6,7 @@ import { db, mongoClient } from "@/lib/mongo";
 const googleClientId =
   process.env.GOOGLE_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
-// Keep in sync with MIN_PASSWORD_LENGTH in src/components/auth-form.tsx.
+// Keep in sync with src/lib/password.ts (MIN_PASSWORD_LENGTH).
 const MIN_PASSWORD_LENGTH = 6;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
@@ -35,6 +35,14 @@ export const auth = betterAuth({
     // Keep readers signed in for a week, refreshing once a day.
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
+  },
+  user: {
+    changeEmail: {
+      enabled: true,
+      // No email-verification service is configured, so allow direct changes
+      // from the profile page. (Verified/OAuth accounts still can't change.)
+      updateEmailWithoutVerification: true,
+    },
   },
   plugins: [jwt()],
 });

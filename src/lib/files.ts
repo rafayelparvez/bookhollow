@@ -1,11 +1,9 @@
-export const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
-
-export function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () =>
-      reject(new Error("Could not read the selected image."));
-    reader.readAsDataURL(file);
-  });
+/** True when the value is an absolute http(s) URL. */
+export function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }

@@ -9,7 +9,7 @@ import { useCurrentUser } from "@/lib/auth";
 import { categoryOptions } from "@/lib/book-categories";
 import { updateBookRequest } from "@/lib/book-mutations";
 import { isBookAddedByUser, useBooks } from "@/lib/books";
-import { MAX_IMAGE_BYTES, readFileAsDataUrl } from "@/lib/files";
+import { isHttpUrl } from "@/lib/files";
 
 const fieldBase =
   "w-full rounded-lg border border-ink/15 bg-cream font-sans text-sm text-ink outline-none transition placeholder:text-ink/35 hover:border-ink/25 focus:border-brand focus:ring-4 focus:ring-brand/15 dark:border-cream/15 dark:bg-ink-900 dark:text-cream dark:placeholder:text-cream/35 dark:hover:border-cream/25 dark:focus:border-brand-light dark:focus:ring-brand-light/20";
@@ -101,6 +101,9 @@ function EditBookFields({ bookId }: { bookId: string }) {
   }
 
   const editTarget = book;
+  const coverIsUrl = !!editTarget.image && isHttpUrl(editTarget.image);
+  const coverIsDataUrl =
+    !!editTarget.image && editTarget.image.startsWith("data:");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,15 +116,12 @@ function EditBookFields({ bookId }: { bookId: string }) {
     setSubmitError("");
 
     try {
-      let image: string | null = editTarget.image;
-
-      const file = formData.get("image");
-      if (file instanceof File && file.size > 0) {
-        if (file.size > MAX_IMAGE_BYTES) {
-          throw new Error("The image must be 2 MB or smaller.");
-        }
-        image = await readFileAsDataUrl(file);
+      const imageInput = String(formData.get("image") ?? "").trim();
+      if (imageInput && !isHttpUrl(imageInput)) {
+        throw new Error("Please enter a valid image URL starting with http:// or https://.");
       }
+      // Empty keeps the current cover; a URL replaces it.
+      const image = imageInput ? imageInput : editTarget.image;
 
       await updateBookRequest(editTarget._id, {
         title: String(formData.get("title") ?? ""),
@@ -242,16 +242,23 @@ function EditBookFields({ bookId }: { bookId: string }) {
 
           <Field
             id="image"
-            label="Replace Cover"
-            hint="Leave empty to keep the current cover."
+            label="Book Image URL"
+            hint={
+              coverIsDataUrl
+                ? "The current cover is a stored upload. Paste a URL to replace it, or leave empty to keep it."
+                : "Leave empty to keep the current cover."
+            }
             className="sm:col-span-2"
           >
             <input
               id="image"
               name="image"
-              type="file"
-              accept="image/*"
-              className="block w-full cursor-pointer rounded-lg border border-dashed border-ink/20 bg-cream p-1.5 font-sans text-sm text-ink/50 transition hover:border-brand/40 focus:border-brand focus:ring-4 focus:ring-brand/15 focus:outline-none file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-brand/10 file:px-4 file:py-2 file:font-sans file:text-sm file:font-semibold file:text-brand hover:file:bg-brand/15 dark:border-cream/20 dark:bg-ink-900 dark:text-cream/50 dark:hover:border-brand-light/50 dark:focus:border-brand-light dark:focus:ring-brand-light/20 dark:file:bg-brand/15 dark:file:text-brand-light dark:hover:file:bg-brand/20"
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              defaultValue={coverIsUrl ? (editTarget.image ?? "") : ""}
+              placeholder="https://example.com/cover.jpg"
+              className={`${fieldBase} h-11 px-3.5`}
             />
           </Field>
 
